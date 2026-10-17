@@ -1,0 +1,37 @@
+book_id,title,author,genre,description
+B001,The Hobbit,J.R.R. Tolkien,Fantasy Adventure,A quiet hobbit joins a dangerous journey with dwarves to reclaim treasure from a dragon.
+B002,Harry Potter and the Philosopher's Stone,J.K. Rowling,Fantasy Magic,A young wizard discovers his magical identity and attends a school of witchcraft and wizardry.
+B003,The Fellowship of the Ring,J.R.R. Tolkien,Fantasy Adventure,A hobbit carries a powerful ring on a quest to stop a dark lord.
+B004,The Hunger Games,Suzanne Collins,Dystopian Adventure,A teenage girl competes in a televised survival contest in a strict future society.
+B005,Divergent,Veronica Roth,Dystopian Science Fiction,A young woman discovers she does not fit into a society divided by personality groups.
+B006,The Martian,Andy Weir,Science Fiction Adventure,An astronaut uses science and engineering to survive alone on Mars.
+B007,Dune,Frank Herbert,Science Fiction Politics,A young noble becomes involved in a struggle over a desert planet and a valuable resource.
+B008,Foundation,Isaac Asimov,Science Fiction,A mathematician predicts the fall of a galactic empire and works to preserve knowledge.
+B009,Murder on the Orient Express,Agatha Christie,Mystery Crime,Detective Hercule Poirot investigates a murder aboard a luxury train.
+B010,The Girl with the Dragon Tattoo,Stieg Larsson,Mystery Crime Thriller,A journalist and a skilled hacker investigate a decades-old disappearance.
+B011,Gone Girl,Gillian Flynn,Psychological Thriller Mystery,"A wife's disappearance leads to secrets, suspicion, and unreliable stories."
+B012,The Da Vinci Code,Dan Brown,Mystery Thriller,A professor follows clues hidden in art and history to solve a secretive mystery.
+B013,Pride and Prejudice,Jane Austen,Romance Classic,"A witty young woman navigates love, family expectations, and social class."
+B014,Me Before You,Jojo Moyes,Romance Drama,An unlikely relationship changes the lives of a young caregiver and a wealthy man.
+B015,The Fault in Our Stars,John Green,Romance Drama,Two teenagers with serious illnesses fall in love and reflect on life.
+B016,The Notebook,Nicholas Sparks,Romance Drama,A lifelong love story unfolds through memories and difficult choices.
+B017,To Kill a Mockingbird,Harper Lee,Classic Drama,A child observes prejudice and justice in a small southern town.
+B018,1984,George Orwell,Dystopian Classic,A man struggles against surveillance and control in an authoritarian society.
+B019,Animal Farm,George Orwell,Political Satire Classic,Farm animals create a new society that gradually becomes oppressive.
+B020,The Alchemist,Paulo Coelho,Philosophy Adventure,A shepherd travels in search of treasure and learns about purpose and dreams.
+B021,Sapiens,Yuval Noah Harari,History Nonfiction,"A broad account of human history, culture, and the development of societies."
+B022,Atomic Habits,James Clear,Self Help Productivity,A practical guide to building good habits and changing behavior through small improvements.
+B023,Deep Work,Cal Newport,Self Help Productivity,A guide to focused work and reducing distractions in a busy world.
+B024,Think and Grow Rich,Napoleon Hill,Self Help Business,"A classic personal-development book about goals, mindset, and achievement."
+B025,The Psychology of Money,Morgan Housel,Finance Psychology,Stories explain how emotions and behavior influence financial decisions.
+B026,Educated,Tara Westover,Memoir Biography,A woman raised in an isolated family pursues education and reconsiders her past.
+B027,Becoming,Michelle Obama,Memoir Biography,"A personal memoir about family, identity, public service, and growth."
+B028,The Silent Patient,Alex Michaelides,Psychological Thriller Mystery,A therapist tries to understand why a woman stopped speaking after a violent event.
+B029,The Shining,Stephen King,Horror Thriller,A family staying in an isolated hotel faces frightening supernatural events.
+B030,The Name of the Wind,Patrick Rothfuss,Fantasy Adventure,"A gifted young man recounts his life, learning, music, and encounters with magic."
+B031,"The Lion, the Witch and the Wardrobe",C.S. Lewis,Fantasy Adventure,Children enter a magical land ruled by a powerful witch and help restore it.
+B032,The Old Man and the Sea,Ernest Hemingway,Classic Adventure,An aging fisherman struggles with a giant fish far out at sea.
+B033,The Book Thief,Markus Zusak,Historical Fiction Drama,A young girl finds comfort in books during World War II in Germany.
+B034,The Three-Body Problem,Liu Cixin,Science Fiction Mystery,Scientists encounter a mystery connected to an alien civilization.
+B035,The Thursday Murder Club,Richard Osman,Mystery Comedy Crime,A group of retirement-home friends investigate a real murder case.
+B036,The 7 Habits of Highly Effective People,Stephen R. Covey,Self Help Productivity,"A guide to personal effectiveness, priorities, and constructive habits."
