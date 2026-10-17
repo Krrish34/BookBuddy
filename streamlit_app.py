@@ -1,287 +1,321 @@
 
 import streamlit as st
 import pandas as pd
+import re
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
+# ---------------- PAGE SETTINGS ----------------
 st.set_page_config(
-    page_title="BookBuddy | Discover Your Next Read",
+    page_title="BookBuddy | Find Your Next Read",
     page_icon="📚",
     layout="wide"
 )
 
-# ---------- PREMIUM DESIGN ----------
+# ---------------- STYLING ----------------
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap');
 
 .stApp {
-    background: linear-gradient(135deg, #101827, #17263a 60%, #24364b);
-    color: #f7f0e5;
+    background: #F7F4ED;
+    color: #26352D;
     font-family: 'DM Sans', sans-serif;
 }
-header[data-testid="stHeader"] {
-    background: transparent;
-}
 .block-container {
-    max-width: 1150px;
-    padding-top: 2rem;
+    max-width: 1050px;
+    padding-top: 2.5rem;
     padding-bottom: 3rem;
 }
 h1, h2, h3 {
-    font-family: 'Playfair Display', Georgia, serif !important;
-    color: #fff3df !important;
-}
-p, label, .stMarkdown {
-    color: #e4e2dd;
+    font-family: 'Playfair Display', serif !important;
+    color: #26352D !important;
 }
 .hero {
+    background: #E6EBDD;
     padding: 35px;
-    border: 1px solid #435166;
-    border-radius: 24px;
-    background: linear-gradient(120deg, #26364b, #192538);
+    border-radius: 20px;
     margin-bottom: 25px;
 }
 .eyebrow {
-    color: #e6b96d;
-    font-size: 12px;
-    font-weight: 700;
+    color: #39745B;
+    text-transform: uppercase;
     letter-spacing: 3px;
-}
-.hero-title {
-    font-family: 'Playfair Display', Georgia, serif;
-    font-size: clamp(38px, 5vw, 60px);
-    line-height: 1.1;
-    color: #fff3df;
-    margin: 14px 0;
-}
-.hero-copy {
-    font-size: 16px;
-    color: #cbd4df;
-    max-width: 650px;
-}
-.stat {
-    background: #202f43;
-    border: 1px solid #3c4a5e;
-    border-radius: 15px;
-    padding: 17px;
-    text-align: center;
-}
-.stat-number {
-    font-size: 27px;
-    font-weight: 700;
-    color: #e6b96d;
-}
-.stat-label {
     font-size: 12px;
-    color: #cbd4df;
+    font-weight: 700;
 }
 .book-card {
-    background: #f6efe3;
-    color: #253044;
+    background: #FFFFFF;
     padding: 22px;
-    border-radius: 17px;
-    border: 1px solid #e7d6bb;
-    min-height: 180px;
-    margin-bottom: 15px;
+    border: 1px solid #E5E3DA;
+    border-radius: 16px;
+    margin-bottom: 14px;
 }
-.book-card h3 {
-    color: #253044 !important;
+.book-title {
+    font-family: 'Playfair Display', serif;
     font-size: 21px;
-    margin-bottom: 7px;
-}
-.book-card p {
-    color: #5b6573;
-    font-size: 14px;
-}
-.tag {
-    display: inline-block;
-    background: #ead7b8;
-    color: #65461f;
-    border-radius: 20px;
-    padding: 5px 10px;
-    font-size: 11px;
     font-weight: 700;
-    margin: 5px 0;
+    color: #26352D;
 }
-.section-title {
-    font-family: 'Playfair Display', Georgia, serif;
-    font-size: 28px;
-    color: #fff3df;
-    margin-top: 20px;
+.book-meta {
+    color: #39745B;
+    font-size: 13px;
+    margin-top: 5px;
+    margin-bottom: 10px;
+}
+.book-description {
+    color: #626A62;
+    font-size: 14px;
+    line-height: 1.6;
 }
 div.stButton > button {
-    background: #e6b96d;
-    color: #182337;
-    border: none;
+    background: #39745B;
+    color: white;
     border-radius: 10px;
-    min-height: 45px;
-    font-weight: 700;
-    transition: 0.2s;
+    border: none;
+    padding: 0.7rem 1.3rem;
+    font-weight: 600;
+    width: 100%;
 }
 div.stButton > button:hover {
-    background: #f3d49d;
-    color: #101827;
-    border: none;
+    background: #285640;
+    color: white;
 }
-div[data-baseweb="select"] > div {
-    background: #f6efe3;
-    color: #253044;
-    border-radius: 10px;
-}
-div[data-testid="stTextInput"] input {
-    background: #f6efe3;
-    color: #253044;
-    border-radius: 10px;
-}
-hr {
-    border-color: #3c4a5e;
-}
-footer {visibility: hidden;}
 </style>
 """, unsafe_allow_html=True)
 
-# ---------- LOAD DATA ----------
+
+# ---------------- LOAD BOOK DATA ----------------
 @st.cache_data
 def load_books():
     df = pd.read_csv("books.csv")
     df.columns = df.columns.str.strip().str.lower()
+
+    # Support common column names
+    rename_map = {
+        "book_title": "title",
+        "name": "title",
+        "book name": "title",
+        "book_author": "author",
+        "category": "genre",
+        "summary": "description"
+    }
+    df = df.rename(columns=rename_map)
+
+    if "title" not in df.columns:
+        raise ValueError("books.csv must contain a title column.")
+
+    for col in ["author", "genre", "description"]:
+        if col not in df.columns:
+            df[col] = "Not specified"
+
+    for col in ["title", "author", "genre", "description"]:
+        df[col] = df[col].fillna("Not specified").astype(str).str.strip()
+
+    df = df[df["title"] != ""].drop_duplicates(subset=["title"])
+    df = df.reset_index(drop=True)
+
+    # Combine book information for content-based recommendations
+    df["features"] = (
+        df["title"] + " " +
+        df["author"] + " " +
+        df["genre"] + " " +
+        df["description"]
+    )
+
     return df
 
-st.markdown("""
-<div class="hero">
-    <div class="eyebrow">YOUR PERSONAL READING COMPANION</div>
-    <div class="hero-title">Every book leads<br>to another world.</div>
-    <div class="hero-copy">
-        Discover stories, explore new ideas, and find your next favourite
-        book with personalised content-based recommendations.
-    </div>
-</div>
-""", unsafe_allow_html=True)
 
 try:
     books = load_books()
+except Exception as e:
+    st.error("Could not load books.csv. Check that it is uploaded beside streamlit_app.py.")
+    st.code(str(e))
+    st.stop()
 
-    title_col = next(
-        (c for c in ["title", "book_title", "name"] if c in books.columns),
-        None
+
+# ---------------- HEADER ----------------
+st.markdown("""
+<div class="hero">
+    <div class="eyebrow">YOUR PERSONAL BOOK COMPANION</div>
+    <h1 style="font-size:44px; margin-bottom:5px;">
+        Find your next favourite read.
+    </h1>
+    <p style="font-size:16px; color:#526258; max-width:650px;">
+        Explore books by genre and discover stories that match your interests.
+        Your next great read is just a click away.
+    </p>
+</div>
+""", unsafe_allow_html=True)
+
+col1, col2 = st.columns(2)
+with col1:
+    st.metric("Books in library", len(books))
+with col2:
+    genre_count = books["genre"].replace(
+        ["", "Not specified"], pd.NA
+    ).nunique()
+    st.metric("Genres available", genre_count)
+
+st.divider()
+
+
+# ---------------- USER SELECTION ----------------
+st.subheader("Let's find your next read")
+st.write("Choose a genre, then select a book you already enjoy.")
+
+genres = sorted([
+    g for g in books["genre"].unique()
+    if g and g.lower() != "not specified"
+])
+
+genre_options = ["All Genres"] + genres
+
+selected_genre = st.selectbox(
+    "1. Select a genre",
+    genre_options,
+    help="Choose All Genres to explore the entire library."
+)
+
+if selected_genre == "All Genres":
+    genre_books = books.copy()
+else:
+    # Match the selected genre exactly
+    genre_books = books[
+        books["genre"].str.casefold() == selected_genre.casefold()
+    ].copy()
+
+if genre_books.empty:
+    st.warning("There are no books in this genre yet. Try another genre.")
+    st.stop()
+
+book_titles = sorted(genre_books["title"].unique())
+
+selected_book = st.selectbox(
+    "2. Select a book you like",
+    book_titles
+)
+
+number_of_recommendations = st.slider(
+    "3. Number of recommendations",
+    min_value=1,
+    max_value=min(10, max(1, len(genre_books) - 1)),
+    value=min(5, max(1, len(genre_books) - 1))
+)
+
+recommendation_type = st.radio(
+    "Recommendation preference",
+    ["Same genre only", "Similar books across all genres"],
+    horizontal=True,
+    help="Same genre only keeps every recommendation in your selected genre."
+)
+
+find_button = st.button("Find my next read", use_container_width=True)
+
+
+# ---------------- RECOMMENDATION ENGINE ----------------
+if find_button:
+    # Build TF-IDF vectors from the book details
+    vectorizer = TfidfVectorizer(
+        stop_words="english",
+        ngram_range=(1, 2)
     )
-    author_col = next(
-        (c for c in ["author", "authors", "writer"] if c in books.columns),
-        None
-    )
-    genre_col = next(
-        (c for c in ["genre", "genres", "category", "subject"] if c in books.columns),
-        None
-    )
+    matrix = vectorizer.fit_transform(books["features"])
 
-    if title_col is None:
-        st.error("A title column was not found in books.csv.")
-        st.write("Your CSV columns:", list(books.columns))
-        st.stop()
+    # Calculate similarity between all books
+    similarity_scores = cosine_similarity(matrix)
 
-    books = books.dropna(subset=[title_col]).reset_index(drop=True)
-    books[title_col] = books[title_col].astype(str)
-    books = books.drop_duplicates(subset=[title_col]).reset_index(drop=True)
+    selected_index = books.index[
+        books["title"] == selected_book
+    ].tolist()[0]
 
-    # Build recommendation features from available book information
-    feature_cols = [
-        c for c in books.columns
-        if c != title_col and c.lower() not in ["id", "book_id", "isbn", "rating"]
+    scores = list(enumerate(similarity_scores[selected_index]))
+
+    # Exclude the selected book itself
+    scores = [
+        (idx, score) for idx, score in scores
+        if idx != selected_index
     ]
 
-    if feature_cols:
-        features = books[feature_cols].fillna("").astype(str).agg(" ".join, axis=1)
+    # Filter recommendations based on the user's choice
+    if recommendation_type == "Same genre only":
+        allowed_indices = set(genre_books.index)
+        scores = [
+            (idx, score) for idx, score in scores
+            if idx in allowed_indices
+        ]
+
+    # Sort by similarity score, highest first
+    scores.sort(key=lambda item: item[1], reverse=True)
+    recommendations = scores[:number_of_recommendations]
+
+    st.divider()
+    st.subheader("Your recommended reads")
+    st.caption(f"Because you liked **{selected_book}**")
+
+    if not recommendations:
+        st.info(
+            "No other books match these settings yet. "
+            "Choose another genre or select similar books across all genres."
+        )
     else:
-        features = books[title_col]
+        for rank, (idx, score) in enumerate(recommendations, start=1):
+            book = books.loc[idx]
 
-    vectorizer = TfidfVectorizer(stop_words="english")
-    matrix = vectorizer.fit_transform(features)
-    similarity = cosine_similarity(matrix)
+            title = book["title"]
+            author = book["author"]
+            genre = book["genre"]
+            description = book["description"]
 
-    # ---------- QUICK STATS ----------
-    a, b, c = st.columns(3)
-    with a:
-        st.markdown(
-            f'<div class="stat"><div class="stat-number">{len(books)}</div>'
-            '<div class="stat-label">BOOKS IN LIBRARY</div></div>',
-            unsafe_allow_html=True
-        )
-    with b:
-        st.markdown(
-            f'<div class="stat"><div class="stat-number">{len(feature_cols)}</div>'
-            '<div class="stat-label">BOOK DATA FIELDS</div></div>',
-            unsafe_allow_html=True
-        )
-    with c:
-        st.markdown(
-            '<div class="stat"><div class="stat-number">AI + ML</div>'
-            '<div class="stat-label">RECOMMENDATION ENGINE</div></div>',
-            unsafe_allow_html=True
-        )
-
-    st.markdown('<div class="section-title">Find your next read</div>',
-                unsafe_allow_html=True)
-    st.write("Choose a book you enjoy. BookBuddy will find similar books.")
-
-    titles = books[title_col].tolist()
-    selected = st.selectbox("I recently enjoyed...", titles)
-
-    left, right = st.columns([2, 1])
-    with left:
-        count = st.slider(
-            "How many recommendations?",
-            1, min(5, max(1, len(books) - 1)),
-            min(3, max(1, len(books) - 1))
-        )
-    with right:
-        st.write("")
-        st.write("")
-        recommend = st.button("✨ Discover Books", use_container_width=True)
-
-    if recommend:
-        index = titles.index(selected)
-        scores = list(enumerate(similarity[index]))
-        scores.sort(key=lambda x: x[1], reverse=True)
-        results = [(i, score) for i, score in scores if i != index][:count]
-
-        st.markdown('<div class="section-title">Picked just for you</div>',
-                    unsafe_allow_html=True)
-        st.caption("Recommendations are ranked by content similarity.")
-
-        columns = st.columns(min(3, max(1, len(results))))
-        for position, (i, score) in enumerate(results):
-            row = books.iloc[i]
-            author = str(row[author_col]) if author_col else "Author not listed"
-            genre = str(row[genre_col]) if genre_col else "Discover"
-            with columns[position % len(columns)]:
-                st.markdown(f"""
-                <div class="book-card">
-                    <div style="font-size:30px">📖</div>
-                    <span class="tag">{genre}</span>
-                    <h3>{row[title_col]}</h3>
-                    <p>By {author}</p>
-                    <p>Similarity score: {score:.2f}</p>
+            st.markdown(f"""
+            <div class="book-card">
+                <div class="eyebrow">RECOMMENDATION {rank}</div>
+                <div class="book-title">{title}</div>
+                <div class="book-meta">
+                    By {author} &nbsp; • &nbsp; {genre}
                 </div>
-                """, unsafe_allow_html=True)
+                <div class="book-description">{description}</div>
+            </div>
+            """, unsafe_allow_html=True)
 
-    with st.expander("📚 Explore the book collection"):
-        search = st.text_input("Search by book title")
-        display = books.copy()
-        if search:
-            display = display[
-                display[title_col].str.contains(search, case=False, na=False)
-            ]
-        st.dataframe(display, use_container_width=True, hide_index=True)
+            st.progress(float(max(0, min(1, score))),
+                        text=f"Similarity: {score * 100:.1f}%")
 
-    st.markdown("---")
-    st.markdown(
-        "<p style='text-align:center;color:#b6c1cf'>"
-        "BOOKBUDDY · Read more. Discover more. 📚</p>",
-        unsafe_allow_html=True
+
+# ---------------- LIBRARY ----------------
+with st.expander("Explore the complete book library"):
+    search_text = st.text_input(
+        "Search by title, author, or genre",
+        placeholder="e.g. Harry Potter, Rowling, Fantasy"
     )
 
-except FileNotFoundError:
-    st.error("Could not find books.csv. Keep it in the same folder as streamlit_app.py.")
-except Exception as e:
-    st.error(f"Something went wrong: {e}")
+    display_books = books.copy()
+
+    if selected_genre != "All Genres":
+        display_books = display_books[
+            display_books["genre"].str.casefold()
+            == selected_genre.casefold()
+        ]
+
+    if search_text:
+        pattern = re.escape(search_text)
+        mask = display_books[
+            ["title", "author", "genre", "description"]
+        ].apply(
+            lambda col: col.str.contains(
+                pattern, case=False, na=False
+            )
+        ).any(axis=1)
+        display_books = display_books[mask]
+
+    st.dataframe(
+        display_books[["title", "author", "genre", "description"]],
+        use_container_width=True,
+        hide_index=True
+    )
+
+st.markdown("""
+<div style="text-align:center; color:#7A8279; padding:25px 0 5px;">
+    Made for readers, by BookBuddy 📚
+</div>
+""", unsafe_allow_html=True)
