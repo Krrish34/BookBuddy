@@ -1,16 +1,20 @@
 
-import streamlit as st
-import pandas as pd
+import html
 import re
+
+import pandas as pd
+import streamlit as st
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
+
 
 # ---------------- PAGE SETTINGS ----------------
 st.set_page_config(
     page_title="BookBuddy | Find Your Next Read",
     page_icon="📚",
-    layout="wide"
+    layout="wide",
 )
+
 
 # ---------------- STYLING ----------------
 st.markdown("""
@@ -85,37 +89,42 @@ div.stButton > button:hover {
 """, unsafe_allow_html=True)
 
 
-# ---------------- LOAD BOOK DATA ----------------
+# ---------------- LOAD BOOKS ----------------
 @st.cache_data
 def load_books():
     df = pd.read_csv("books.csv")
     df.columns = df.columns.str.strip().str.lower()
 
-    # Support common column names
     rename_map = {
         "book_title": "title",
         "name": "title",
         "book name": "title",
         "book_author": "author",
         "category": "genre",
-        "summary": "description"
+        "summary": "description",
     }
     df = df.rename(columns=rename_map)
 
     if "title" not in df.columns:
-        raise ValueError("books.csv must contain a title column.")
+        raise ValueError(
+            "books.csv must contain a column named 'title'."
+        )
 
-    for col in ["author", "genre", "description"]:
-        if col not in df.columns:
-            df[col] = "Not specified"
+    for column in ["author", "genre", "description"]:
+        if column not in df.columns:
+            df[column] = "Not specified"
 
-    for col in ["title", "author", "genre", "description"]:
-        df[col] = df[col].fillna("Not specified").astype(str).str.strip()
+    for column in ["title", "author", "genre", "description"]:
+        df[column] = (
+            df[column]
+            .fillna("Not specified")
+            .astype(str)
+            .str.strip()
+        )
 
-    df = df[df["title"] != ""].drop_duplicates(subset=["title"])
-    df = df.reset_index(drop=True)
+    df = df[df["title"].ne("")]
+    df = df.drop_duplicates(subset=["title"]).reset_index(drop=True)
 
-    # Combine book information for content-based recommendations
     df["features"] = (
         df["title"] + " " +
         df["author"] + " " +
@@ -128,9 +137,16 @@ def load_books():
 
 try:
     books = load_books()
-except Exception as e:
-    st.error("Could not load books.csv. Check that it is uploaded beside streamlit_app.py.")
-    st.code(str(e))
+except Exception as error:
+    st.error(
+        "Could not read books.csv. Check its column names and CSV format."
+    )
+    st.code(str(error))
+    st.stop()
+
+
+if books.empty:
+    st.error("Your book library is empty. Add books to books.csv.")
     st.stop()
 
 
@@ -149,146 +165,182 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 col1, col2 = st.columns(2)
+
 with col1:
     st.metric("Books in library", len(books))
+
 with col2:
-    genre_count = books["genre"].replace(
-        ["", "Not specified"], pd.NA
-    ).nunique()
-    st.metric("Genres available", genre_count)
+    valid_genres = books.loc[
+        ~books["genre"].str.lower().isin(["", "not specified"]),
+        "genre"
+    ].nunique()
+    st.metric("Genres available", valid_genres)
 
 st.divider()
 
 
-# ---------------- USER SELECTION ----------------
+# ---------------- GENRE SELECTION ----------------
 st.subheader("Let's find your next read")
 st.write("Choose a genre, then select a book you already enjoy.")
 
-genres = sorted([
-    g for g in books["genre"].unique()
-    if g and g.lower() != "not specified"
-])
+genres = sorted(
+    books.loc[
+        ~books["genre"].str.lower().isin(["", "not specified"]),
+        "genre"
+    ].unique().tolist(),
+    key=str.casefold,
+)
 
 genre_options = ["All Genres"] + genres
 
 selected_genre = st.selectbox(
     "1. Select a genre",
     genre_options,
-    help="Choose All Genres to explore the entire library."
 )
 
 if selected_genre == "All Genres":
     genre_books = books.copy()
 else:
-    # Match the selected genre exactly
     genre_books = books[
         books["genre"].str.casefold() == selected_genre.casefold()
     ].copy()
 
 if genre_books.empty:
-    st.warning("There are no books in this genre yet. Try another genre.")
+    st.warning("No books are available in this genre.")
     st.stop()
 
-book_titles = sorted(genre_books["title"].unique())
+
+# ---------------- BOOK SELECTION ----------------
+book_titles = sorted(
+    genre_books["title"].unique().tolist(),
+    key=str.casefold,
+)
 
 selected_book = st.selectbox(
     "2. Select a book you like",
-    book_titles
+    book_titles,
 )
 
-max_recommendations = max(1, min(10, len(genre_books) - 1))
+# How many other books can be recommended?
+max_recommendations = min(10, len(books) - 1)
 
-number_of_recommendations = st.slider(
+if max_recommendations < 1:
+    st.info("Add at least two books to get recommendations.")
+    st.stop()
+
+number_of_recommendations = st.selectbox(
     "3. Number of recommendations",
-    min_value=1,
-    max_value=max_recommendations,
-    value=min(5, max_recommendations)
+    list(range(1, max_recommendations + 1)),
+    index=min(4, max_recommendations - 1),
 )
 
 recommendation_type = st.radio(
     "Recommendation preference",
-    ["Same genre only", "Similar books across all genres"],
+    [
+        "Same genre only",
+        "Similar books across all genres",
+    ],
     horizontal=True,
-    help="Same genre only keeps every recommendation in your selected genre."
+    help="Choose whether recommendations must stay in the selected genre.",
 )
 
-find_button = st.button("Find my next read", use_container_width=True)
+find_button = st.button(
+    "Find my next read",
+    use_container_width=True,
+)
 
 
-# ---------------- RECOMMENDATION ENGINE ----------------
+# ---------------- RECOMMENDATIONS ----------------
 if find_button:
-    # Build TF-IDF vectors from the book details
+    # TF-IDF converts book details into numerical features.
     vectorizer = TfidfVectorizer(
         stop_words="english",
-        ngram_range=(1, 2)
+        ngram_range=(1, 2),
     )
+
     matrix = vectorizer.fit_transform(books["features"])
 
-    # Calculate similarity between all books
-    similarity_scores = cosine_similarity(matrix)
+    # Calculate similarity between books.
+    similarity_matrix = cosine_similarity(matrix)
 
-    selected_index = books.index[
+    selected_matches = books.index[
         books["title"] == selected_book
-    ].tolist()[0]
+    ].tolist()
 
-    scores = list(enumerate(similarity_scores[selected_index]))
+    if not selected_matches:
+        st.error("Selected book could not be found.")
+        st.stop()
 
-    # Exclude the selected book itself
+    selected_index = selected_matches[0]
+
+    scores = list(
+        enumerate(similarity_matrix[selected_index])
+    )
+
+    # Remove the selected book from its own recommendations.
     scores = [
-        (idx, score) for idx, score in scores
-        if idx != selected_index
+        (index, score)
+        for index, score in scores
+        if index != selected_index
     ]
 
-    # Filter recommendations based on the user's choice
+    # Keep recommendations within the chosen genre if requested.
     if recommendation_type == "Same genre only":
         allowed_indices = set(genre_books.index)
+
         scores = [
-            (idx, score) for idx, score in scores
-            if idx in allowed_indices
+            (index, score)
+            for index, score in scores
+            if index in allowed_indices
         ]
 
-    # Sort by similarity score, highest first
     scores.sort(key=lambda item: item[1], reverse=True)
+
     recommendations = scores[:number_of_recommendations]
 
     st.divider()
     st.subheader("Your recommended reads")
-    st.caption(f"Because you liked **{selected_book}**")
+    st.caption(f"Because you liked {selected_book}")
 
     if not recommendations:
         st.info(
-            "No other books match these settings yet. "
+            "No other books are available for this selection. "
             "Choose another genre or select similar books across all genres."
         )
     else:
-        for rank, (idx, score) in enumerate(recommendations, start=1):
-            book = books.loc[idx]
+        for rank, (index, score) in enumerate(recommendations, start=1):
+            book = books.iloc[index]
 
-            title = book["title"]
-            author = book["author"]
-            genre = book["genre"]
-            description = book["description"]
+            title = html.escape(str(book["title"]))
+            author = html.escape(str(book["author"]))
+            genre = html.escape(str(book["genre"]))
+            description = html.escape(str(book["description"]))
 
-            st.markdown(f"""
-            <div class="book-card">
-                <div class="eyebrow">RECOMMENDATION {rank}</div>
-                <div class="book-title">{title}</div>
-                <div class="book-meta">
-                    By {author} &nbsp; • &nbsp; {genre}
+            st.markdown(
+                f"""
+                <div class="book-card">
+                    <div class="eyebrow">RECOMMENDATION {rank}</div>
+                    <div class="book-title">{title}</div>
+                    <div class="book-meta">
+                        By {author} &nbsp; • &nbsp; {genre}
+                    </div>
+                    <div class="book-description">{description}</div>
                 </div>
-                <div class="book-description">{description}</div>
-            </div>
-            """, unsafe_allow_html=True)
+                """,
+                unsafe_allow_html=True,
+            )
 
-            st.progress(float(max(0, min(1, score))),
-                        text=f"Similarity: {score * 100:.1f}%")
+            st.progress(
+                max(0.0, min(1.0, float(score))),
+                text=f"Similarity score: {score * 100:.1f}%",
+            )
 
 
-# ---------------- LIBRARY ----------------
+# ---------------- COMPLETE BOOK LIBRARY ----------------
 with st.expander("Explore the complete book library"):
     search_text = st.text_input(
         "Search by title, author, or genre",
-        placeholder="e.g. Harry Potter, Rowling, Fantasy"
+        placeholder="e.g. Harry Potter, Rowling, Fantasy",
     )
 
     display_books = books.copy()
@@ -299,21 +351,32 @@ with st.expander("Explore the complete book library"):
             == selected_genre.casefold()
         ]
 
-    if search_text:
-        pattern = re.escape(search_text)
-        mask = display_books[
-            ["title", "author", "genre", "description"]
-        ].apply(
-            lambda col: col.str.contains(
-                pattern, case=False, na=False
+    if search_text.strip():
+        pattern = re.escape(search_text.strip())
+
+        searchable_columns = [
+            "title",
+            "author",
+            "genre",
+            "description",
+        ]
+
+        mask = display_books[searchable_columns].apply(
+            lambda column: column.str.contains(
+                pattern,
+                case=False,
+                na=False,
             )
         ).any(axis=1)
+
         display_books = display_books[mask]
 
     st.dataframe(
-        display_books[["title", "author", "genre", "description"]],
+        display_books[
+            ["title", "author", "genre", "description"]
+        ],
         use_container_width=True,
-        hide_index=True
+        hide_index=True,
     )
 
 st.markdown("""
