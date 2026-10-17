@@ -196,8 +196,6 @@ selected_book = st.selectbox(
     book_titles
 )
 
-number_of_recommendations = st.slider(
-   
 max_recommendations = max(1, min(10, len(genre_books) - 1))
 
 number_of_recommendations = st.slider(
