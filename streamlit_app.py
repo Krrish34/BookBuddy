@@ -197,10 +197,14 @@ selected_book = st.selectbox(
 )
 
 number_of_recommendations = st.slider(
+   
+max_recommendations = max(1, min(10, len(genre_books) - 1))
+
+number_of_recommendations = st.slider(
     "3. Number of recommendations",
     min_value=1,
-    max_value=min(10, max(1, len(genre_books) - 1)),
-    value=min(5, max(1, len(genre_books) - 1))
+    max_value=max_recommendations,
+    value=min(5, max_recommendations)
 )
 
 recommendation_type = st.radio(
